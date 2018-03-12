@@ -1,6 +1,13 @@
 package controllers
 
-import javax.inject._
+import javax.inject.{Singleton, _}
+
+import akka.stream.scaladsl.Source
+import play.api.http.ContentTypes
+import play.api.libs.EventSource
+import play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher
+import play.api.libs.iteratee.{Concurrent, Enumerator}
+import play.api.libs.json.JsValue
 import play.api.mvc._
 
 /**
@@ -10,14 +17,21 @@ import play.api.mvc._
 @Singleton
 class HomeController @Inject()(cc: ControllerComponents) extends AbstractController(cc) {
 
-  /**
-   * Create an Action to render an HTML page with a welcome message.
-   * The configuration in the `routes` file means that this method
-   * will be called when the application receives a `GET` request with
-   * a path of `/`.
-   */
-  def index = Action {
-    Ok(views.html.index("Your new application is ready."))
+  val (chatOut: Enumerator[JsValue], chatChannel) = Concurrent.broadcast[JsValue]
+
+  def index = Action { implicit req =>
+    Ok(views.html.index(routes.HomeController.chatFeed(), routes.HomeController.postMessage()))
   }
 
+  def chatFeed = Action {req =>
+//    console.log(s"Someone joined at: ${req.remoteAddress}")
+    Ok.chunked(
+      Source.fromPublisher(enumeratorToPublisher(chatOut))
+         via EventSource.flow
+    ).as(ContentTypes.EVENT_STREAM)
+  }
+
+  def postMessage = Action(parse.json) { req =>
+    chatChannel.push(req.body); Ok
+  }
 }
