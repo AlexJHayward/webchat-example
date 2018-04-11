@@ -1,43 +1,157 @@
-@*
- * This template takes a single argument, a String containing a
- * message to display.
- *@
-@(stream: Call, post: Call)(implicit req: RequestHeader)
+@(publish: Call, subscribe: Call)(implicit req: RequestHeader)
 
 @import helper._
 
-@main("Chat Room") {
+    @main("Chat Room") {
 
-    <div class="log"></div>
-    <input type="text" id="message" placeholder="Type here..."/>
+@*    page template *@
 
-    <script>
-        var user = prompt("What would you like to be called?", "unknown");
+        <div class="grid-container">
+            @*create a colour picker, the id of each button defines the colour it represents *@
+            <div class="colour-picker">
+                <a id="#1abc9c"></a>
+                <a id="#2ecc71"></a>
+                <a id="#3498db"></a>
+                <a id="#9b59b6"></a>
+                <a id="#34495e"></a>
+                <a id="#16a085"></a>
+                <a id="#27ae60"></a>
+                <a id="#2980b9"></a>
+                <a id="#8e44ad"></a>
+                <a id="#2c3e50"></a>
+                <a id="#f1c40f"></a>
+                <a id="#e67e22"></a>
+                <a id="#e74c3c"></a>
+                <a id="#f39c12"></a>
+                <a id="#d35400"></a>
+                <a id="#c8832c"></a>
+            </div>
+            <div id="log-wrapper"><div id="log"></div></div>
+            <input type="text" id="messagebox" placeholder="What would you like to be called?"/>
+        </div>
+        <script>
 
-        $("#message").keyup(function (e) {
-            if (e.keyCode != 13) //if not enter don't send
-                return
-            else {
-                console.log(e);
+                @*on document ready, subscribe to the redis websocket (subscribes to the channel)*@
+                $(document).ready(function () {
+                    var subscribeUrl = "@subscribe.webSocketURL()";
 
-                var m = {message: this.value, user: user};
-                var c = "@CSRF.getToken.value"
-                this.value = "";
-                $.ajax({
-                    url: "@post.toString",
-                    data: JSON.stringify(m),
-                    method: "post",
-                    contentType: "application/json",
-                    beforeSend: function(xhr){xhr.setRequestHeader('Csrf-Token', c);}
+                    startSocket(subscribeUrl);
+
+                    socket.onclose = function (event) {
+                        console.log(event);
+                        console.log("attempting to reconnect...");
+                        socket.close();
+                        startSocket(subscribeUrl);
+                    };
                 });
-            }
-        });
 
-        var feed = new EventSource('@stream.absoluteURL()');
-        feed.addEventListener("message", function (msg) {
-            var m = JSON.parse(msg.data);
-            $(".log").append("<div class='message'>" + m.user + ": " + m.message + "</div>");
-        });
-    </script>
+                //abstracted function to implement basic reconnect. This is because of what appears to be a bug in the
+                //play websocket implementation.
+                function startSocket(url) {
+                    socket = new WebSocket(url);
 
-}
+                    socket.onmessage = function (msg) {
+                        appendMsg(msg);
+                    };
+                }
+
+                var colour = "#c8832c"; //orange is the default colour
+                $('.colour-picker > a').each(function () {
+                    this.style = "background-color: " + this.id; //set button background based on id
+                }).click(function (e) {
+                    //on click style the user's colour as the selected option
+                    e.preventDefault();
+                    colour = this.id;
+                    $('.mymessage').each(function () {
+                        $(this).removeAttr('style');
+                        $(this).css('color', colour);
+                    });
+                    return false;
+                });
+
+                //default username value.
+                var user = "";
+                //used to identify two users with the same username in the same screen as unique
+                var uuid = '_' + Math.random().toString(36).substr(2, 9);
+
+                $("#messagebox").keyup(function (e) {
+
+                    var v = this.value;
+
+                    if (e.keyCode == 13 && v != "") { //if the user hits enter nad has typed something in to the box
+
+                        if (user == "") {
+                            //if the username hasn't been set yet, publish the user has joined to the channel and set
+                            //the name
+                            var jsonu = {name: v, kind: "user"};
+                            sendToRedis(JSON.stringify(jsonu));
+                            user = v;
+                            this.value = "";
+                            $(this).attr('placeholder', "Type here, hit enter to send..."); //change instruction in message box
+                        } else {
+                            //otherwise will always be a message, attach all details and send, then clear box ready for
+                            //next message
+                            var jsonm = {message: v, meid: uuid, user: user, colour: colour, kind: "message"};
+                            sendToRedis(JSON.stringify(jsonm));
+                            this.value = "";
+                        }
+                    }
+                });
+
+                //publish the message with ajax
+                function sendToRedis(m) {
+                    $.ajax({
+                        url: "@publish.absoluteURL()",
+                        data: m,
+                        method: "post",
+                        contentType: "application/json",
+                        beforeSend: function (xhr) {
+                            xhr.setRequestHeader('Csrf-Token', "@CSRF.getToken.value");
+                        }
+                    });
+                }
+
+                //get current time, should reimplement so that it is sent with the message
+                function fmtTime() {
+                    var d = new Date();
+                    return toDubDigits(d.getHours()) + ":" + toDubDigits(d.getMinutes()) + ":" + toDubDigits(d.getSeconds());
+                }
+
+                //12:12:1 -> 12:12:01
+                function toDubDigits(i) {
+                    var n = i.toString();
+                    if (n.length == 1)
+                        return "0" + n;
+                    else
+                        return n;
+                }
+
+                //adds a message to the chat log
+                function appendMsg (msg) {
+
+                    var m = JSON.parse(msg.data);
+                    var k = m.kind;
+
+                    var i = ""; //eventual inserted message
+
+                    if (k == "message") { //if it was not a new user notification
+
+                        var u = m.user;
+                        var id = m.meid;
+                        var c = m.colour;
+
+                        //style with attached colour
+                        i = "<div class='message slideInUp'>" + fmtTime() + " <span class='message-user' style='color: " + c + "'>" + u + "</span> " + m.message + "</div>";
+
+                        if (uuid == id) //if the message was sent by the current user, append extra class
+                            i = "<div class='message slideInUp'>" + fmtTime() + " <span class='message-user mymessage' style='color: " + c + "'>" + m.user + "</span> " + m.message + "</div>";
+
+                    } else { //if it is not a message then it is a new user joining so notify the other members of the room.
+                        i = "<div class='usernotification'>" + fmtTime() + " " + m.name + " has joined </div>";
+                    }
+
+                    $("#log").append(i);
+                }
+        </script>
+
+    }

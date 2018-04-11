@@ -1,0 +1,90 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.colour-picker{
+    grid-area: right;
+    opacity: 0.5;
+}
+#log-wrapper{ grid-area: main; }
+#messagebox{ grid-area: footer; }
+
+.grid-container {
+    display: grid;
+    grid-template-areas: 'main right';
+    grid-template-columns: auto 150px;
+    height: calc(100% - 45px);
+}
+
+.colour-picker:hover {
+
+    opacity: 1;
+
+    -webkit-transition: opacity 0.5s ease-in-out;
+    -moz-transition: opacity 0.5s ease-in-out;
+    -ms-transition: opacity 0.5s ease-in-out;
+    -o-transition: opacity 0.5s ease-in-out;
+    transition: opacity 0.5s ease-in-out;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+    outline: none;
+}
+
+.colour-picker {
+    width: 150px;
+    overflow-y: auto;
+    align-content: right;
+}
+
+.colour-picker > a {
+    width: 30px;
+    height: 30px;
+    border-radius: 30px;
+    float: right;
+    margin: 10px;
+}
+
+.colour-picker > a:hover {
+    cursor: pointer;
+}
+
+#log-wrapper {
+    flex: 1;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+#messagebox {
+    position: fixed;
+    left: 5px;
+    bottom: 5px;
+    height: 30px;
+    width: 95%;
+    font-family: "Courier New", Courier, monospace;
+    font-size: medium;
+    border-color: #c7c7c7;
+    border-width: 0px 0px 1px 0px;
+}
+
+#messagebox:focus {
+    border-color: #6a6a6a;
+}
+
+.message-user {
+    font-weight: bold;
+}
+
+.message {
+    font-family: "Courier New", Courier, monospace;
+}
+.usernotification {
+    font-family: "Courier New", Courier, monospace;
+    color: #c7c7c7;
+}
