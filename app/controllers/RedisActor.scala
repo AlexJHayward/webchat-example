@@ -9,10 +9,10 @@ import redis.actors.RedisSubscriberActor
 import redis.api.pubsub.{Message, PMessage}
 
 //akka actor implementing the redis listening capabilities
-class RedisActor(redis: RedisClient, out: ActorRef, channels: Seq[String] = Nil, patterns: Seq[String] = Nil)
+class RedisActor(redis: RedisClient, out: ActorRef, channels: Seq[String] = Nil)
     extends RedisSubscriberActor(new InetSocketAddress(redis.host, redis.port),
                                  channels,
-                                 patterns,
+                                 patterns = Seq.empty,
                                  onConnectStatus = connected ⇒ { println(s"connected: $connected") }) {
 
   Logger.logger.debug(s"started")

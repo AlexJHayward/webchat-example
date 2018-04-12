@@ -30,7 +30,7 @@ class Application @Inject()(cc: ControllerComponents, configuration: play.api.Co
     }
   }
 
-  // publish a new message to the channel
+  // pulish a new message to the channel
   def publishMessage = Action(parse.json) { req ⇒
     redis.publish(channel, req.body.toString)
     Ok
